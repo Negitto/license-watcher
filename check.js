@@ -92,9 +92,9 @@ async function main() {
 
       // 5分おきに毎回通知すると多すぎるため、
       // ちょうど1時間に1回(0〜4分の間に実行されたタイミング)だけ
-      // 「空きはないが監視は継続中」という定時報告を送る
+      // 「空きはないが監視は継続中」という定時報告を、30分おき(0分台・30分台)に送る
       const minutes = new Date().getUTCMinutes();
-      if (minutes < 5) {
+      if (minutes < 3 || (minutes >= 30 && minutes < 33)) {
         await notifyHeartbeat(allResults);
       }
     }
@@ -247,7 +247,7 @@ async function notify(openings) {
   }
 }
 
-// 定時報告 (空きがなくても、1時間に1回「監視は継続中」と伝える)
+// 定時報告 (空きがなくても、30分に1回「監視は継続中」と伝える)
 async function notifyHeartbeat(allResults) {
   const checkedCount = allResults.length;
   const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
