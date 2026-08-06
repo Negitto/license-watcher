@@ -23,7 +23,25 @@ async function main() {
   const page = await browser.newPage();
 
   try {
-    await page.goto(CALENDAR_URL, { waitUntil: 'networkidle', referer: TOP_URL });
+    // キャッシュされた古いデータを見せられるのを防ぐため、
+    // 「キャッシュを使わない」ヘッダーと、URLにランダムな値を付けてアクセスする
+    await page.setExtraHTTPHeaders({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+    });
+
+    // ページ内部のAJAX通信(日付クリック時など)にも、同じキャッシュ回避ヘッダーを適用する
+    await page.route('**/*', (route) => {
+      const headers = {
+        ...route.request().headers(),
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      };
+      route.continue({ headers });
+    });
+
+    const bustedUrl = CALENDAR_URL + '&_=' + Date.now();
+    await page.goto(bustedUrl, { waitUntil: 'networkidle', referer: TOP_URL });
 
     // Step1: 受験項目「教習所卒業等」(typeDetailChoice=11)
     await page.waitForSelector('input[name="typeDetailChoice"][value="11"]', { timeout: 15000, state: 'attached' });
@@ -228,7 +246,7 @@ async function notify(openings) {
     .join('\n');
 
   // マスターへの報告、という体で通知文を組み立てる
-  const message = `マスター、報告です。\n条件に合致する空き枠を検知しました。\n\n${details}\n\nご確認を推奨します。`;
+  const message = `マスター、報告です。\n条件に合致する空き枠を検知しました。\n\n${details}\n\n※このカレンダーは実際の予約状況と若干のズレがある場合があります。「学科試験の予約」画面で必ず再確認してください。`;
 
   console.log('=== 空き通知 ===\n' + message);
 
