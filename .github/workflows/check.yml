@@ -2,8 +2,8 @@ name: 鮫洲試験場 空き状況チェック
 
 on:
   schedule:
-    # 5分おきに実行 (UTC基準。cronの遅延で実際は数分ずれることがあります)
-    - cron: '*/5 * * * *'
+    # 3分おきに実行 (UTC基準。cronの遅延で実際は数分ずれることがあります)
+    - cron: '*/3 * * * *'
   workflow_dispatch: {} # 手動実行用ボタン
 
 permissions:
