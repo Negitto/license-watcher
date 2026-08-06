@@ -89,6 +89,14 @@ async function main() {
       console.log('空きを検知しました:', JSON.stringify(openings, null, 2));
     } else {
       console.log(`マスター、報告です。条件に合致する空き枠はありませんでした。(確認日時: ${new Date().toISOString()})`);
+
+      // 5分おきに毎回通知すると多すぎるため、
+      // ちょうど1時間に1回(0〜4分の間に実行されたタイミング)だけ
+      // 「空きはないが監視は継続中」という定時報告を送る
+      const minutes = new Date().getUTCMinutes();
+      if (minutes < 5) {
+        await notifyHeartbeat(allResults);
+      }
     }
 
     // 今回確認した内容を一覧表示(座席数の詳細確認用)
@@ -234,6 +242,30 @@ async function notify(openings) {
         title: '報告：空き枠を検知しました',
         message,
         priority: '1',
+      }),
+    });
+  }
+}
+
+// 定時報告 (空きがなくても、1時間に1回「監視は継続中」と伝える)
+async function notifyHeartbeat(allResults) {
+  const checkedCount = allResults.length;
+  const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+
+  const message = `マスター、定時報告です。\n現在、条件に合致する空き枠はありません。\n監視は継続中です(${checkedCount}件の枠を確認済み)。\n\n確認時刻: ${now}`;
+
+  console.log('=== 定時報告 ===\n' + message);
+
+  if (process.env.PUSHOVER_TOKEN && process.env.PUSHOVER_USER) {
+    await fetch('https://api.pushover.net/1/messages.json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        token: process.env.PUSHOVER_TOKEN,
+        user: process.env.PUSHOVER_USER,
+        title: '定時報告：監視は継続中です',
+        message,
+        priority: '-1', // 通常より控えめな通知(音を鳴らさない端末設定に配慮)
       }),
     });
   }
