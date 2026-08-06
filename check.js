@@ -74,6 +74,20 @@ async function main() {
       safety++;
       const availableDates = await getAvailableDates(page);
 
+      // 「今日の日付」はサイトが最初から選択済みの状態のため、
+      // そのままクリックしてもデータが更新されない可能性がある。
+      // 他の日付が2つ以上ある場合は、今日以外の日付を一度経由してから
+      // 今日の日付を処理することで、確実にデータ更新のきっかけを作る
+      if (availableDates.length > 1) {
+        const todayJST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+        const todayIndex = availableDates.findIndex(d => d.isoDate === todayJST);
+        if (todayIndex > 0) {
+          // 今日より前に他の日付があるなら、それを並び替えて先に処理する
+          const [todayItem] = availableDates.splice(todayIndex, 1);
+          availableDates.push(todayItem);
+        }
+      }
+
       for (const d of availableDates) {
         if (d.isoDate > TARGET_LIMIT_DATE) continue;
 
@@ -192,8 +206,37 @@ async function goToNextMonth(page) {
 // 指定した日付のセルをクリックする
 async function clickDate(page, d) {
   const selector = `#datepicker td[data-month="${d.month}"][data-year="${d.year}"] a[data-date="${d.day}"]`;
+
+  // すでに選択済みの日付(特に「今日」)だと、クリックしても
+  // 実際にはデータ更新のイベントが発生しない可能性があるため、
+  // 一度その日付の選択状態を明示的に外し、あらためて選び直す
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (el) {
+      el.classList.remove('ui-state-active');
+      const td = el.closest('td');
+      if (td) td.classList.remove('ui-datepicker-current-day');
+    }
+  }, selector);
+
   await page.$eval(selector, el => el.click());
-  await page.waitForTimeout(800);
+
+  // ローディング表示(空き状況を調べています...)が出て、消えるまで待つことで、
+  // 確実に新しいデータへの更新が完了したタイミングを捉える
+  try {
+    await page.waitForFunction(() => {
+      const loading = document.querySelector('#waitVisitTimeList');
+      return loading && getComputedStyle(loading).display !== 'none';
+    }, { timeout: 2000 });
+  } catch {
+    // ローディングが一瞬すぎて検知できない場合もあるので、失敗しても続行する
+  }
+  await page.waitForFunction(() => {
+    const loading = document.querySelector('#waitVisitTimeList');
+    return !loading || getComputedStyle(loading).display === 'none';
+  }, { timeout: 10000 }).catch(() => {});
+
+  await page.waitForTimeout(500); // 描画の反映を少し待つ
 }
 
 // 受付時間リストから「残り○名」を抽出
