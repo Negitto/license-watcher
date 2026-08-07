@@ -81,8 +81,9 @@ async function main() {
       if (availableDates.length > 1) {
         const todayJST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
         const todayIndex = availableDates.findIndex(d => d.isoDate === todayJST);
-        if (todayIndex > 0) {
-          // 今日より前に他の日付があるなら、それを並び替えて先に処理する
+        // 「今日」はカレンダー上、日付順で常に先頭(0番目)に来るため、
+        // todayIndex > 0 ではなく、見つかったかどうか(-1でないか)で判定する必要があった
+        if (todayIndex !== -1) {
           const [todayItem] = availableDates.splice(todayIndex, 1);
           availableDates.push(todayItem);
         }
@@ -120,7 +121,7 @@ async function main() {
       await notify(openings);
       console.log('空きを検知しました:', JSON.stringify(openings, null, 2));
     } else {
-      console.log(`マスター、報告です。条件に合致する空き枠はありませんでした。(確認日時: ${new Date().toISOString()})`);
+      console.log(`ご主人様、報告です。条件に合致する空き枠はございませんでした。(確認日時: ${new Date().toISOString()})`);
 
       // 5分おきに毎回通知すると多すぎるため、
       // ちょうど1時間に1回(0〜4分の間に実行されたタイミング)だけ
@@ -299,8 +300,8 @@ async function notify(openings) {
     .map(o => `${o.date}:\n` + o.slots.filter(s => s.remaining > 0).map(s => '  ' + s.text).join('\n'))
     .join('\n');
 
-  // マスターへの報告、という体で通知文を組み立てる
-  const message = `マスター、報告です。\n条件に合致する空き枠を検知しました。\n\n${details}\n\n※このカレンダーは実際の予約状況と若干のズレがある場合があります。「学科試験の予約」画面で必ず再確認してください。`;
+  // ご主人様への報告、という体で通知文を組み立てる(ほんのりメイド風)
+  const message = `ご主人様、ご報告です。\n空き枠を見つけました、どうぞご確認くださいませ。\n\n${details}\n\n※このカレンダーは実際の予約状況と若干のズレがある場合がございます。「学科試験の予約」画面で必ず再確認をお願いいたします。`;
 
   console.log('=== 空き通知 ===\n' + message);
 
@@ -324,7 +325,7 @@ async function notifyHeartbeat(allResults) {
   const checkedCount = allResults.length;
   const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
 
-  const message = `マスター、定時報告です。\n現在、条件に合致する空き枠はありません。\n監視は継続中です(${checkedCount}件の枠を確認済み)。\n\n確認時刻: ${now}`;
+  const message = `ご主人様、定時のご報告です。\n現在、空き枠はございません。\n監視は続けておりますので、ご安心くださいませ(${checkedCount}件確認済み)。\n\n確認時刻: ${now}`;
 
   console.log('=== 定時報告 ===\n' + message);
 
@@ -345,7 +346,7 @@ async function notifyHeartbeat(allResults) {
 
 // エラー発生時も同じ口調で通知する(冷静に、事実だけを告げる)
 async function notifyError(err) {
-  const message = `マスター、報告です。\n監視処理中にエラーが発生しました。非効率的な状態です。\n\n${err.message || err}`;
+  const message = `ご主人様、申し訳ございません。\n監視処理中にエラーが発生いたしました。\n\n${err.message || err}`;
 
   console.log('=== エラー通知 ===\n' + message);
 
