@@ -38,19 +38,10 @@ async function main() {
       route.continue({ headers });
     });
 
-    // ショートカット(直接カレンダーURLにリファラを偽装してアクセスする方法)だと、
-    // サイト側で正式なセッションが確立されず、正しくないデータが返る可能性があるため、
-    // 必ずトップページから、実際のユーザーと同じ手順でクリックして辿る
-    await page.goto(TOP_URL, { waitUntil: 'networkidle' });
-
-    // トップページで「学科試験の予約はこちら」を選ぶ
-    // (このメニューの中に「空き状況カレンダー」の選択肢も含まれている)
-    await page.waitForSelector('#licensetest', { timeout: 15000, state: 'attached' });
-    await clickById(page, 'licensetest');
-
-    // 続いて表示される「空き状況カレンダー」(typeChoice=11)を選ぶ
-    await page.waitForSelector('input[name="typeChoice"][value="11"]', { timeout: 15000, state: 'attached' });
-    await clickByRadio(page, 'typeChoice', '11');
+    // 直接カレンダーURLにアクセスする(トップページ経由の完全な手順は
+    // #licensetestが見つからず失敗したため、確実に動作するこちらの方式に戻した)
+    const bustedUrl = CALENDAR_URL + '&_=' + Date.now();
+    await page.goto(bustedUrl, { waitUntil: 'networkidle', referer: TOP_URL });
 
     // Step1: 受験項目「教習所卒業等」(typeDetailChoice=11)
     await page.waitForSelector('input[name="typeDetailChoice"][value="11"]', { timeout: 15000, state: 'attached' });
