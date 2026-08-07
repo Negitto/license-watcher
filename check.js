@@ -24,13 +24,11 @@ async function main() {
 
   try {
     // キャッシュされた古いデータを見せられるのを防ぐため、
-    // 「キャッシュを使わない」ヘッダーと、URLにランダムな値を付けてアクセスする
+    // 「キャッシュを使わない」ヘッダーを設定する
     await page.setExtraHTTPHeaders({
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
     });
-
-    // ページ内部のAJAX通信(日付クリック時など)にも、同じキャッシュ回避ヘッダーを適用する
     await page.route('**/*', (route) => {
       const headers = {
         ...route.request().headers(),
@@ -40,8 +38,19 @@ async function main() {
       route.continue({ headers });
     });
 
-    const bustedUrl = CALENDAR_URL + '&_=' + Date.now();
-    await page.goto(bustedUrl, { waitUntil: 'networkidle', referer: TOP_URL });
+    // ショートカット(直接カレンダーURLにリファラを偽装してアクセスする方法)だと、
+    // サイト側で正式なセッションが確立されず、正しくないデータが返る可能性があるため、
+    // 必ずトップページから、実際のユーザーと同じ手順でクリックして辿る
+    await page.goto(TOP_URL, { waitUntil: 'networkidle' });
+
+    // トップページで「学科試験の予約はこちら」を選ぶ
+    // (このメニューの中に「空き状況カレンダー」の選択肢も含まれている)
+    await page.waitForSelector('#licensetest', { timeout: 15000, state: 'attached' });
+    await clickById(page, 'licensetest');
+
+    // 続いて表示される「空き状況カレンダー」(typeChoice=11)を選ぶ
+    await page.waitForSelector('input[name="typeChoice"][value="11"]', { timeout: 15000, state: 'attached' });
+    await clickByRadio(page, 'typeChoice', '11');
 
     // Step1: 受験項目「教習所卒業等」(typeDetailChoice=11)
     await page.waitForSelector('input[name="typeDetailChoice"][value="11"]', { timeout: 15000, state: 'attached' });
@@ -142,6 +151,17 @@ async function main() {
     process.exitCode = 1;
   } finally {
     await browser.close();
+  }
+}
+
+// idで指定した要素(ラジオボタンなど)を囲むlabel要素をクリックする
+async function clickById(page, id) {
+  const input = page.locator(`#${id}`).first();
+  const label = input.locator('xpath=ancestor::label[1]');
+  if (await label.count() > 0) {
+    await label.evaluate(el => el.click());
+  } else {
+    await input.evaluate(el => el.click());
   }
 }
 
